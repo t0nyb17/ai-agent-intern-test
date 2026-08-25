@@ -472,8 +472,8 @@ Before production, I would add stronger metadata-aware retrieval/reranking, stru
 
 
 # 12. Demo Video / GIF
-<video controls src="Screen Recording 2026-08-25 231944.mp4" title="Title"></video>
-<video controls src="Recording 2026-08-25 231657.mp4" title="Title"></video>
+![alt text](demo.gif)
+![alt text](demo2.gif)
 ![alt text](image.png) ![alt text](<Screenshot 2026-08-25 211335.png>) ![alt text](<Screenshot 2026-08-25 211435.png>) ![alt text](<Screenshot 2026-08-25 221734.png>)
 
 ### Final
