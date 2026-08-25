@@ -472,7 +472,8 @@ Before production, I would add stronger metadata-aware retrieval/reranking, stru
 
 
 # 12. Demo Video / GIF
-demo.gif
+Link to demo video
+https://drive.google.com/file/d/1heS9sWXwcua4WuBQlO3QoNEKLSX1mApM/view?usp=sharing
 ![alt text](demo-1.gif)
 ![alt text](image.png) ![alt text](<Screenshot 2026-08-25 211335.png>) ![alt text](<Screenshot 2026-08-25 211435.png>) ![alt text](<Screenshot 2026-08-25 221734.png>)
 
