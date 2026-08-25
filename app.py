@@ -1,14 +1,12 @@
-import os
 import re
 
 import streamlit as st
-
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 
 from rag import search_knowledge_base
-from orders import get_order, safe_order
+from orders import get_order, sanitize_order
 
 
 load_dotenv()
@@ -20,13 +18,16 @@ st.set_page_config(
 
 st.title("Aster & Row Support")
 
+
 llm = ChatGroq(
     model="openai/gpt-oss-20b",
     temperature=0
 )
 
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -47,6 +48,7 @@ def find_order_id(text):
 
 
 def is_order_question(text):
+
     words = [
         "order",
         "delivery",
@@ -65,6 +67,7 @@ def is_order_question(text):
 
 
 def is_unsupported_action(text):
+
     words = [
         "cancel",
         "change my address",
@@ -91,6 +94,7 @@ def answer_from_documents(question, documents):
     sources = []
 
     for document in documents:
+
         source = document.metadata.get("source")
 
         if source and source not in sources:
@@ -144,12 +148,14 @@ def answer_order_question(question, order_id):
     order = get_order(order_id)
 
     if order is None:
+
         return (
-            f"I couldn't find an order with ID {order_id}.",
+            f"I couldn't find an order with ID {order_id}. "
+            "Please check the order ID or contact human support.",
             False
         )
 
-    order = safe_order(order)
+    order = sanitize_order(order)
 
     prompt = ChatPromptTemplate.from_template(
         """
@@ -158,15 +164,16 @@ You are an Aster & Row customer support assistant.
 Answer the customer's question using ONLY the
 order information below.
 
-Do not invent information.
+Rules:
 
-Do not reveal private customer information.
-
-Do not provide a delivery estimate unless it exists
-in the supplied order information.
-
-If the order is cancelled or returned, do not provide
-stale delivery information.
+- Do not invent information.
+- Do not reveal private customer information.
+- Do not provide a delivery estimate unless it exists
+  in the supplied order information.
+- If the order is cancelled or returned, do not provide
+  stale delivery information.
+- Use the current order status as authoritative.
+- If the required information is unavailable, say so.
 
 Order information:
 
@@ -194,6 +201,7 @@ question = st.chat_input(
     "Ask about orders, returns, shipping..."
 )
 
+
 if question:
 
     st.session_state.messages.append(
@@ -206,6 +214,7 @@ if question:
     with st.chat_message("user"):
         st.write(question)
 
+
     if is_unsupported_action(question):
 
         answer = (
@@ -216,12 +225,14 @@ if question:
 
         sources = []
 
+
     elif (
         find_order_id(question)
         or is_order_question(question)
     ):
 
         order_id = find_order_id(question)
+
 
         if not order_id:
 
@@ -236,6 +247,7 @@ if question:
                 if order_id:
                     break
 
+
         if not order_id:
 
             answer = (
@@ -244,6 +256,7 @@ if question:
             )
 
             sources = []
+
 
         else:
 
@@ -254,11 +267,13 @@ if question:
 
             sources = []
 
+
     else:
 
         documents = search_knowledge_base(
             question
         )
+
 
         if not documents:
 
@@ -270,6 +285,7 @@ if question:
 
             sources = []
 
+
         else:
 
             answer, sources = answer_from_documents(
@@ -277,9 +293,11 @@ if question:
                 documents
             )
 
+
     with st.chat_message("assistant"):
 
         st.write(answer)
+
 
         if sources:
 
@@ -287,6 +305,7 @@ if question:
 
                 for source in sources:
                     st.write(f"- {source}")
+
 
     st.session_state.messages.append(
         {
