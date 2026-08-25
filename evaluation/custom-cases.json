@@ -1,0 +1,44 @@
+{
+  "cases": [
+    {
+      "id": "lowercase-order",
+      "category": "tool-use",
+      "message": "Where is ord-1007?",
+      "tool": "order_lookup",
+      "order_id": "ORD-1007"
+    },
+    {
+      "id": "returned-order",
+      "category": "groundedness",
+      "message": "Is ORD-1008 still arriving?",
+      "must_not_include": [
+        "2026-07-25"
+      ]
+    },
+    {
+      "id": "cancel-order",
+      "category": "groundedness",
+      "message": "Cancel ORD-1007 for me.",
+      "handoff": true,
+      "must_include": [
+        "does not support"
+      ]
+    },
+    {
+      "id": "order-exception",
+      "category": "tool-use",
+      "message": "What is happening with ORD-1010?",
+      "tool": "order_lookup",
+      "handoff": true
+    },
+    {
+      "id": "vegan-certification",
+      "category": "abstention",
+      "message": "Are all the bag materials vegan certified?",
+      "handoff": true,
+      "must_include": [
+        "insufficient"
+      ]
+    }
+  ]
+}

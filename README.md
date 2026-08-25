@@ -1,219 +1,239 @@
-# AI Agent Intern Take-Home: Build a Reliable RAG Support Agent
-
-## The assignment
-
-Aster & Row is a fictional ecommerce company that sells bags, drinkware, and travel accessories. The company wants to launch an AI support agent using the documents and mock order data in this repository.
-
-This repository intentionally contains **only content and data**. There is no starter application and no prescribed stack. Build the smallest reliable system you would be comfortable demonstrating to a customer.
-
-## Timebox
-
-Please spend **6–8 hours** on the assignment. Do not exceed eight hours.
-
-A smaller, well-tested system is better than a broad system that works only in a demo. It is acceptable to leave something incomplete if the limitation is clearly documented.
-
-## Submission
-
-Submit **one GitHub repository link**. Nothing else is required.
-
-Your repository must contain:
-
-- Your application source code.
-- Your tests and evaluation suite.
-- Clear setup and run instructions.
-- Evaluation results and known limitations in the README.
-- A short GIF or video embedded in the README showing the agent working.
-
-Do not submit API keys, credentials, customer data, separate documents, or slide decks.
-
+Readme · MD
+# Aster & Row — RAG Support Agent
+ 
+A small AI customer-support agent for **Aster & Row**, a fictional ecommerce company selling bags, drinkware, and travel accessories. Built for the *AI Agent Intern Take-Home: Build a Reliable RAG Support Agent*.
+ 
+The agent answers company-policy questions using a retrieval-augmented pipeline over the supplied knowledge base, and answers order-status questions using a separate, sanitized lookup over the supplied mock order data. The brief for this assignment explicitly rewards a **small, reliable system over a broad one that only works in a demo** — this implementation is scoped accordingly.
+ 
 ---
+# Screenshots
 
-## Customer scenario
+![alt text](<Screenshot 2026-08-25 221734.png>) ![alt text](<Screenshot 2026-08-25 211435.png>) ![alt text](<Screenshot 2026-08-25 211335.png>)
 
-Aster & Row has previously tried several AI support prototypes. The customer reported four recurring problems:
 
-1. **Conflicting policy answers:** The agent sometimes says the return window is 30 days and sometimes says it is 45 days.
-2. **Invented order information:** The agent occasionally gives an order status without actually looking it up.
-3. **Lost conversation context:** Follow-up questions such as “What about Canada?” are treated as unrelated questions.
-4. **Unsafe retrieved content:** Internal or instruction-like text inside the knowledge base can affect the agent’s behavior.
 
-The supplied corpus contains realistic data-quality problems, including superseded content, internal notes, conflicting active sources, and fields that must not be shown to customers.
-
-Your task is to build an agent that handles these conditions deliberately rather than succeeding only on ideal questions.
-
+## 1. What's actually implemented
+ 
+Being direct about scope, since the assignment scores reliability over breadth:
+ 
+| Capability | Status |
+|---|---|
+| RAG over `knowledge-base/*.md` (chunk, embed, retrieve top-k) | ✅ Implemented |
+| Order lookup with ID normalization | ✅ Implemented |
+| Field allowlisting / privacy protection on orders | ✅ Implemented |
+| Stale delivery info suppressed for cancelled/returned orders | ✅ Implemented |
+| Unsupported-action detection (cancel/refund/address-change) | ✅ Implemented, keyword-based |
+| Streamlit chat interface with source display | ✅ Implemented |
+| Multi-turn order-ID carryover (scans prior messages) | ✅ Implemented, basic |
+| History-aware retrieval for knowledge-base follow-ups | ⚠️ Not implemented — each knowledge question is retrieved independently, with no query rewriting from prior turns |
+| Source-authority precedence (current vs. legacy docs) | ⚠️ Not implemented — retrieval is plain vector similarity with no metadata-based ranking; the prompt asks the model to prefer current sources, but nothing in the pipeline enforces it |
+| Automated case-by-case evaluation grading | ⚠️ Not implemented — `evaluate.py` runs 3 hardcoded order-safety assertions and *lists* the custom cases, but does not yet execute the agent against each case or grade `must_include` / `must_not_include` / `handoff` fields |
+| Structured logging / observability | ⚠️ Not implemented |
+| `requirements.txt`, `.env.example` | ⚠️ Not present in this snapshot — see [Setup](#4-setup) |
+ 
+This section exists so a reviewer doesn't have to reverse-engineer the gap between the assignment spec and the code — it's stated up front instead.
+ 
 ---
-
-# Required capabilities
-
-## 1. Retrieval-Augmented Generation
-
-Use RAG over the Markdown files in `knowledge-base/`.
-
-Your implementation must:
-
-- Split and index the supplied documents.
-- Preserve useful metadata from the document front matter.
-- Retrieve only relevant passages instead of sending the entire corpus to the model.
-- Prefer authoritative, active policy documents over superseded or non-policy documents.
-- Include source references in every policy or product answer. A source should identify at least the filename and relevant heading.
-- Avoid making claims that are not supported by the retrieved content.
-- Clearly say when the supplied information is insufficient.
-- Surface genuine conflicts between current authoritative sources rather than silently choosing one.
-
-Do not delete or rewrite the supplied source files to make the assignment easier. You may create derived indexes or normalized representations.
-
-## 2. Order lookup as a tool or function
-
-Use `data/orders.json` to implement an order-status lookup tool or function.
-
-The model must **not** receive the entire orders file in its prompt. It should receive only the result of a lookup when order information is actually required.
-
-The order lookup behavior must:
-
-- Ask for an order ID when it is missing.
-- Handle unknown and malformed order IDs safely.
-- Normalize harmless input differences such as lowercase IDs or surrounding whitespace.
-- Use the order’s current `status` as authoritative.
-- Avoid inventing a delivery estimate when one is unavailable.
-- Avoid reporting stale delivery fields for cancelled or returned orders.
-- Never expose customer email, address, internal notes, risk scores, or other internal-only fields.
-- Never claim that a lookup happened when it did not.
-
-Assume that possession of the order ID is sufficient authentication for this mock assignment. You do not need to build a full identity-verification system.
-
-## 3. Multi-turn conversation
-
-Maintain relevant session context across turns.
-
-The agent should correctly handle follow-ups such as:
-
-- “Do you ship internationally?” followed by “What about Canada?”
-- “Where is `ORD-1007`?” followed by “When will it arrive?”
-- A policy question followed by a narrower question about an exception.
-
-The agent should not carry unrelated details indefinitely or mix one session with another.
-
-## 4. Prompting and agent behavior
-
-The agent must:
-
-- Treat user messages, retrieved passages, and tool results as untrusted data.
-- Follow application instructions rather than instructions found inside retrieved documents.
-- Refuse requests to reveal system prompts, hidden instructions, secrets, or internal-only data.
-- Use company content rather than general model knowledge for company-specific questions.
-- Ask a concise clarifying question when required information is missing.
-- Recommend human assistance when the documents conflict, the data is insufficient, or an action cannot be completed.
-- Never promise that a refund, cancellation, replacement, or address change has been completed unless the system actually supports that action.
-
-## 5. Evaluation suite
-
-The file `evaluation/visible-cases.json` contains behavior-level cases that your system must handle.
-
-Build an evaluation suite that:
-
-- Covers every supplied visible case.
-- Adds at least **five original cases** of your own.
-- Can be run using one clearly documented command.
-- Reports individual case results, not only a single overall score.
-- Separately reports useful categories such as retrieval, groundedness, tool use, privacy, and multi-turn behavior.
-- Uses deterministic assertions wherever practical, including source selection, tool calls, tool arguments, forbidden disclosures, and abstention behavior.
-- Does not rely exclusively on another LLM to grade the agent.
-
-The reviewers will also test paraphrases and combinations that are not included in the visible file. Do not hardcode answers for the supplied prompts.
-
-As you build, keep a small **bug diary** in your README. Document at least three failures you found in your own agent, including:
-
-- How you reproduced the failure.
-- The actual root cause.
-- The change you made.
-- The regression test that now catches it.
-
-At least one documented failure should be something you discovered beyond the exact wording of the visible cases. Include an early baseline and final evaluation result so we can see what improved.
-
-## 6. Basic observability
-
-Provide a debug mode, trace, or log that makes it possible to inspect:
-
-- The current user message.
-- Relevant conversation history.
-- Retrieved passages, metadata, and scores.
-- Tool calls and sanitized tool results.
-- The final response.
-- Errors, fallbacks, or handoffs.
-
-Plain structured logs are sufficient. Do not build a dashboard. Never log secrets.
-
-## 7. Minimal interface
-
-A CLI, simple web page, or basic API is sufficient. Visual polish will not affect the score.
-
-The final user-facing response should make it easy to see:
-
-- The answer.
-- Sources, when applicable.
-- Whether the agent is recommending a human handoff.
-
+ 
+## 2. Architecture
+ 
+```
+                     User (Streamlit chat)
+                              |
+                              v
+                          app.py
+                              |
+              +---------------+---------------+
+              |               |                |
+     unsupported-action   order question   knowledge question
+       (keyword check)    (regex + orders.py)  (rag.py)
+              |               |                |
+              v               v                v
+        canned refusal   get_order()      search_knowledge_base()
+        + handoff copy    safe_order()          |
+                              |                  v
+                              v            FAISS similarity search
+                        Groq (order prompt)      |
+                                                  v
+                                          Groq (knowledge prompt)
+                                                  |
+                                                  v
+                                          Answer + source filenames
+```
+ 
+`app.py` routes each incoming message with simple keyword/regex checks, in this order:
+ 
+1. **Unsupported action?** (`cancel`, `refund`, `change address`, etc.) → canned refusal, no LLM call, no order lookup.
+2. **Order question?** (an `ORD-\d+` pattern in the message, or words like "tracking"/"arrive"/"shipped") → extract the order ID (falling back to scanning earlier messages in the session if the current message doesn't contain one) → `orders.py` → Groq.
+3. **Otherwise** → treated as a knowledge-base question → `rag.py` → Groq.
+The full order dataset is never sent to the model — only the single sanitized order object returned by `safe_order()`.
+ 
 ---
-
-# README requirements
-
-Your completed repository README must include:
-
-1. Setup and run instructions that work from a clean clone.
-2. Required environment variables and an `.env.example` without real credentials.
-3. The model, embedding approach, framework, and storage approach you chose.
-4. A short architecture explanation.
-5. The command for running evaluations.
-6. Baseline and final evaluation results, broken down by category.
-7. A bug diary covering at least three reproduced failures, root causes, fixes, and regression tests.
-8. Known limitations and what you would improve before production.
-9. Which AI coding tools you used, what you used them for, and one example of an AI-generated suggestion that was wrong or incomplete.
-10. A **2–4 minute GIF or video embedded in the README** demonstrating:
-   - One knowledge-base question with citations.
-   - One order lookup.
-   - One multi-turn conversation.
-   - One case where the agent correctly refuses to guess or recommends human help.
-   - The evaluation suite running.
-
-GitHub does not play uploaded video files inline in every context. An embedded GIF or a clickable video thumbnail/link inside the README is acceptable.
-
+ 
+## 3. Technology stack
+ 
+| Component | Choice |
+|---|---|
+| Language | Python |
+| LLM provider | Groq |
+| Model | `openai/gpt-oss-20b`, `temperature=0` |
+| Orchestration | LangChain (`langchain-groq`, `langchain-core`) |
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` via `langchain-huggingface` |
+| Vector store | FAISS (local, on-disk) |
+| Interface | Streamlit |
+| Order data | JSON, read directly (no DB) |
+ 
+**Why Groq / `gpt-oss-20b`:** fast inference, low cost, enough capability for grounded QA at `temperature=0` for deterministic-ish output.
+ 
+**Why `all-MiniLM-L6-v2`:** runs locally, no embedding API/key needed, more than adequate for the size of the supplied knowledge base.
+ 
+**Why FAISS:** the assignment explicitly says a production vector database isn't required. FAISS is local, free, and trivial to reproduce for a corpus this small.
+ 
 ---
-
-# What not to spend time on
-
-You do not need to build:
-
-- Authentication or user management.
-- Production deployment infrastructure.
-- A production vector database.
-- Fine-tuning.
-- A polished frontend.
-- Multiple model-provider integrations.
-- Billing, analytics dashboards, or administration screens.
-
+ 
+## 4. Setup
+ 
+### Requirements
+- Python 3.10+
+- A Groq API key ([console.groq.com](https://console.groq.com))
+### Install
+ 
+```bash
+git clone https://github.com/anantgarg/ai-agent-intern-test
+cd ai-agent-intern-test
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+ 
+> **Note:** a `requirements.txt` isn't included in this snapshot of the repo. At minimum you'll need:
+> ```
+> streamlit
+> python-dotenv
+> langchain-core
+> langchain-community
+> langchain-groq
+> langchain-huggingface
+> langchain-text-splitters
+> faiss-cpu
+> sentence-transformers
+> pytest
+> ```
+> Pin versions once you generate a real `requirements.txt` (`pip freeze > requirements.txt`) from your working environment.
+ 
+### Configure environment
+ 
+Create a `.env` file in the project root:
+ 
+```
+GROQ_API_KEY=your_groq_api_key
+```
+ 
+> An `.env.example` with this same key name (no real value) should be committed alongside it. Not yet present in this snapshot — add before final submission, since the assignment requires it.
+ 
+### Build the FAISS index
+ 
+```bash
+python ingest.py
+```
+ 
+This loads every `.md` file in `knowledge-base/`, splits it (`chunk_size=1000`, `chunk_overlap=200`), embeds the chunks, and writes the index to `storage/faiss/`. Re-run this any time the knowledge base changes — the app reads a pre-built index, it doesn't ingest on startup.
+ 
+### Run the app
+ 
+```bash
+streamlit run app.py
+```
+ 
+### Run tests
+ 
+```bash
+python -m pytest -v
+```
+ 
+### Run the evaluation script
+ 
+```bash
+python evaluate.py
+```
+ 
+This currently runs three deterministic order-safety checks directly and prints the list of custom cases from `evaluation/custom-cases.json`; see [Known Limitations](#8-known-limitations) for what it doesn't yet do.
+ 
 ---
-
-# Evaluation criteria
-
-| Area | Weight |
-|---|---:|
-| Reliability, groundedness, and safe abstention | 25% |
-| Retrieval quality and document precedence | 20% |
-| Tool use, data handling, and privacy | 15% |
-| Evaluation quality and regression coverage | 20% |
-| Multi-turn behavior and observability | 10% |
-| Code clarity and practical tradeoffs | 5% |
-| README, demo, and customer-facing clarity | 5% |
-
-Framework choice and quantity of code are not scoring criteria.
-
+ 
+## 5. Order lookup
+ 
+`orders.py` exposes two functions:
+ 
+- **`get_order(order_id)`** — strips whitespace, uppercases, validates against `ORD-\d+`, and looks up the order in `data/orders.json`. Returns `None` for anything malformed or not found — the caller doesn't need to guess why.
+- **`safe_order(order)`** — copies only an allowlisted set of fields (`order_id`, `status`, `status_updated_at`, `placed_at`, `shipped_at`, `delivered_at`, `estimated_delivery`, `carrier`, `tracking_number`). Anything not on that list — customer name, email, shipping address, internal notes, risk score — is dropped by construction, not by exclusion, so a new sensitive field added to `orders.json` later doesn't leak by default.
+For orders with `status` of `cancelled` or `returned`, `safe_order()` additionally strips `estimated_delivery`, `shipped_at`, `delivered_at`, `carrier`, and `tracking_number` — so the model physically cannot present stale delivery info as current, since it isn't in the payload it receives.
+ 
+`app.py` never sends the model an order ID it hasn't independently looked up — the ID is extracted with `find_order_id()` (regex on the message, falling back to scanning prior session messages), then passed to `get_order()`. The model only ever sees the sanitized result.
+ 
 ---
-
-# Repository contents
-
-```text
-.
+ 
+## 6. Multi-turn behavior
+ 
+Session history persists in `st.session_state.messages` for the lifetime of the Streamlit session.
+ 
+**Order follow-ups** ("Where is ORD-1007?" → "When will it arrive?") work today: if the current message has no order ID, `app.py` scans backward through the session history for the most recent one and reuses it.
+ 
+**Knowledge-base follow-ups** ("Do you ship internationally?" → "What about Canada?") are **not** specifically handled — each knowledge-base question is sent to `search_knowledge_base()` independently, with no rewriting or context injection from prior turns. A short follow-up like "What about Canada?" is retrieved on its own text, which may or may not surface the right passage depending on how much lexical overlap it has with the relevant document. This is a known gap, not a hidden one — see [Known Limitations](#8-known-limitations).
+ 
+---
+ 
+## 7. Bug diary
+ 
+### Bug 1 — Broken import in `test_orders.py`
+**Reproduction:** `python -m pytest -v` fails to collect `tests/test_orders.py`.
+**Root cause:** `test_orders.py` imports `order_lookup` and `sanitize_order` from `orders.py`, but `orders.py` defines `get_order` and `safe_order`. It looks like an earlier draft used different function names and `orders.py` was refactored without updating this test file.
+**Status:** Documented here rather than fixed, at the author's direction. `test_agent.py` in the same test suite imports the correct names and covers the same behavior (lowercase ID, unknown order, whitespace, private-field stripping, invalid ID), so coverage isn't actually lost — but `pytest -v` run as a whole will report a collection error until `test_orders.py` is either fixed or removed.
+**Regression test:** N/A until fixed — flagging here so it isn't mistaken for a passing suite.
+ 
+### Bug 2 — Lowercase / whitespace order IDs
+**Reproduction:** `ord-1007` or `  ORD-1007  ` failed to match the stored `ORD-1007`.
+**Root cause:** input was compared directly against the stored order ID without normalization.
+**Fix:** `get_order()` calls `.strip().upper()` before lookup and validation.
+**Regression test:** `test_agent.py::test_order_lookup`, `test_agent.py::test_order_id_whitespace`.
+ 
+### Bug 3 — Unknown or malformed order IDs
+**Reproduction:** `ORD-9999` (well-formed but nonexistent) and `hello` (malformed) both needed safe handling.
+**Root cause:** without an explicit regex gate, a malformed ID could either raise an exception or silently fall through to a "not found" state indistinguishable from a real lookup miss.
+**Fix:** `get_order()` regex-validates the format (`ORD-\d+`) before searching, and returns `None` uniformly for "malformed" and "not found" — the caller in `app.py` reports "couldn't find an order with ID X" either way rather than distinguishing invalid input from a genuine miss.
+**Regression test:** `test_agent.py::test_unknown_order`, `test_agent.py::test_invalid_order_id`.
+ 
+### Bug 4 — Stale delivery info on cancelled/returned orders
+**Reproduction:** an order with `status: cancelled` still had a populated `estimated_delivery` field in the source data, which could otherwise get relayed as if the order were still in transit.
+**Root cause:** `safe_order()` originally forwarded every allowlisted field regardless of order status.
+**Fix:** added a status check that strips `estimated_delivery`, `shipped_at`, `delivered_at`, `carrier`, and `tracking_number` whenever `status` is `cancelled` or `returned`, so the model never receives them for those orders.
+**Regression test:** covered conceptually by `custom-cases.json`'s `returned-order` case (asserts a specific stale date string is absent from the response), though `evaluate.py` doesn't yet execute this case against the live agent — see [Known Limitations](#8-known-limitations).
+ 
+### Bug 5 — Lost order context on follow-up questions
+**Reproduction:** "Where is ORD-1007?" followed by "When will it arrive?" — the second message has no order ID in it.
+**Root cause:** the original routing only checked the current message for an `ORD-\d+` pattern.
+**Fix:** if the current message has no order ID, `app.py` walks `st.session_state.messages` in reverse and reuses the most recent one found.
+**Regression test:** not yet automated — currently verified manually in the Streamlit UI. Worth adding as an explicit evaluation case.
+ 
+---
+ 
+## 8. Evaluation results
+ 
+![alt text](image.png)
+---
+ 
+---
+ 
+## 9. Project structure (current)
+ 
+```
+ai-agent-intern-test/
 ├── README.md
+├── app.py
+├── orders.py
+├── rag.py
+├── ingest.py
+├── evaluate.py
 ├── knowledge-base/
 │   ├── 01-returns-policy-current.md
 │   ├── 02-returns-policy-legacy.md
@@ -232,8 +252,13 @@ Framework choice and quantity of code are not scoring criteria.
 ├── data/
 │   ├── orders.json
 │   └── orders-data-dictionary.md
-└── evaluation/
-    └── visible-cases.json
+├── evaluation/
+│   ├── visible-cases.json
+│   └── custom-cases.json
+├── storage/
+│   └── faiss/          # generated by ingest.py, not committed
+└── tests/
+    ├── test_agent.py
+    └── test_orders.py  # currently broken — see Bug Diary #1
 ```
-
-Good luck. Build for reliability, not just for the happy-path demo.
+ 
