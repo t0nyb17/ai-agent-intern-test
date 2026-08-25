@@ -1,111 +1,136 @@
 import json
 from pathlib import Path
 
-from orders import get_order, safe_order
+from agent import SupportAgent
 
 
-BASE_DIR = Path(__file__).resolve().parent
-
-CUSTOM_CASES = (
-    BASE_DIR
-    / "evaluation"
-    / "custom-cases.json"
-)
+ROOT = Path(__file__).resolve().parent
+VISIBLE = ROOT / "evaluation" / "visible-cases.json"
+CUSTOM = ROOT / "evaluation" / "custom-cases.json"
 
 
-def test_lowercase_order():
+def run_case(case):
+    agent = SupportAgent()
+    answers = []
+    result = None
 
-    order = get_order(
-        "ord-1007"
-    )
+    messages = case.get("messages")
 
-    assert order is not None
+    if messages:
+        messages = [
+            message["content"]
+            for message in messages
+        ]
+    else:
+        messages = [case["message"]]
 
-    assert (
-        order["order_id"]
-        == "ORD-1007"
-    )
+    for message in messages:
+        result = agent.ask(message)
+        answers.append(result.answer)
 
-    print(
-        "PASS - lowercase order ID"
-    )
+    text = "\n".join(answers).lower()
+    failures = []
 
+    checks = case.get("expect", case)
 
-def test_unknown_order():
+    for value in checks.get("must_include", []):
+        if value.lower() not in text:
+            failures.append(f"missing: {value}")
 
-    order = get_order(
-        "ORD-9999"
-    )
+    for value in checks.get("must_not_include", []):
+        if value.lower() in text:
+            failures.append(f"forbidden: {value}")
 
-    assert order is None
+    if "handoff" in checks:
+        if result.handoff != checks["handoff"]:
+            failures.append("wrong handoff")
 
-    print(
-        "PASS - unknown order"
-    )
+    tool = checks.get("tool")
 
+    if tool == "order_lookup":
+        if not result.tool_calls:
+            failures.append("order lookup was not called")
+        elif result.tool_calls[0].name != "order_lookup":
+            failures.append("wrong tool")
 
-def test_private_information():
+    if tool == "not_called" and result.tool_calls:
+        failures.append("tool was called")
 
-    order = get_order(
-        "ORD-1007"
-    )
-
-    order = safe_order(
-        order
-    )
-
-    assert "customer" not in order
-    assert "email" not in order
-    assert "shipping_address" not in order
-
-    print(
-        "PASS - private information protected"
-    )
+    return len(failures) == 0, failures
 
 
-def load_custom_cases():
-
+def run_file(path):
     data = json.loads(
-        CUSTOM_CASES.read_text(
-            encoding="utf-8"
-        )
+        path.read_text(encoding="utf-8")
     )
 
-    return data["cases"]
+    results = []
+
+    for case in data["cases"]:
+        passed, failures = run_case(case)
+
+        results.append(
+            (
+                case["id"],
+                case["category"],
+                passed,
+                failures,
+            )
+        )
+
+    return results
 
 
 def main():
 
-    print(
-        "\nAster & Row Evaluation"
-    )
+    results = []
 
-    print(
-        "=======================\n"
-    )
+    if VISIBLE.exists():
+        results += run_file(VISIBLE)
 
-    test_lowercase_order()
+    if CUSTOM.exists():
+        results += run_file(CUSTOM)
 
-    test_unknown_order()
+    print("\nCASE RESULTS")
+    print("=" * 60)
 
-    test_private_information()
+    for case_id, category, passed, failures in results:
 
-    cases = load_custom_cases()
-
-    print(
-        f"\nLoaded {len(cases)} custom cases."
-    )
-
-    print(
-        "\nCustom cases:"
-    )
-
-    for case in cases:
+        status = "PASS" if passed else "FAIL"
 
         print(
-            f"- {case['id']} "
-            f"({case['category']})"
+            f"{status:5} {category:20} {case_id}"
         )
+
+        for failure in failures:
+            print(f"      - {failure}")
+
+    print("\nCATEGORY RESULTS")
+    print("=" * 60)
+
+    categories = {}
+
+    for _, category, passed, _ in results:
+        if category not in categories:
+            categories[category] = [0, 0]
+
+        categories[category][1] += 1
+
+        if passed:
+            categories[category][0] += 1
+
+    for category, values in categories.items():
+        print(
+            f"{category:20} {values[0]}/{values[1]}"
+        )
+
+    passed = sum(
+        1 for _, _, ok, _ in results if ok
+    )
+
+    print("\nOVERALL")
+    print("=" * 60)
+    print(f"{passed}/{len(results)} cases passed")
 
 
 if __name__ == "__main__":

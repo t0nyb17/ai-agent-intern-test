@@ -1,37 +1,37 @@
 from pathlib import Path
 
-from langchain_community.vectorstores import FAISS
+from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 
 
-BASE_DIR = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent
+DB = ROOT / "storage" / "chroma"
 
-FAISS_DIR = BASE_DIR / "storage" / "faiss"
+embeddings = HuggingFaceEmbeddings(
+    model_name="BAAI/bge-small-en-v1.5"
+)
 
 
-def get_retriever():
+def search_knowledge_base(question, k=6):
 
-    embeddings = HuggingFaceEmbeddings(
-        model_name="all-MiniLM-L6-v2"
+    db = Chroma(
+        persist_directory=str(DB),
+        collection_name="aster_row",
+        embedding_function=embeddings
     )
 
-    vectorstore = FAISS.load_local(
-        str(FAISS_DIR),
-        embeddings,
-        allow_dangerous_deserialization=True
+    documents = db.similarity_search(
+        question,
+        k=k
     )
 
-    return vectorstore.as_retriever(
-        search_kwargs={
-            "k": 5
-        }
-    )
+    documents = [
+        doc for doc in documents
+        if "02-returns-policy-legacy.md"
+        not in doc.metadata.get("source", "")
+        and
+        "14-internal-content-migration-notes.md"
+        not in doc.metadata.get("source", "")
+    ]
 
-
-def search_knowledge_base(question):
-
-    retriever = get_retriever()
-
-    return retriever.invoke(
-        question
-    )
+    return documents

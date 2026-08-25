@@ -1,82 +1,54 @@
 from pathlib import Path
 
-from langchain_community.document_loaders import TextLoader
-from langchain_community.vectorstores import FAISS
+from langchain_chroma import Chroma
+from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
-BASE_DIR = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent
 
-KNOWLEDGE_BASE = BASE_DIR / "knowledge-base"
-FAISS_DIR = BASE_DIR / "storage" / "faiss"
-
-
-def create_embeddings():
-    return HuggingFaceEmbeddings(
-        model_name="all-MiniLM-L6-v2"
-    )
+KB = ROOT / "knowledge-base"
+DB = ROOT / "storage" / "chroma"
 
 
-def load_documents():
+documents = []
 
-    documents = []
+for path in KB.glob("*.md"):
 
-    for file in KNOWLEDGE_BASE.glob("*.md"):
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        text = path.read_text(encoding="cp1252", errors="replace")
 
-        loader = TextLoader(
-            str(file),
-            encoding="utf-8"
+    documents.append(
+        Document(
+            page_content=text,
+            metadata={
+                "source": path.name
+            }
         )
-
-        documents.extend(
-            loader.load()
-        )
-
-    return documents
-
-
-def create_vector_database():
-
-    print("Loading documents...")
-
-    documents = load_documents()
-
-    print(
-        f"Loaded {len(documents)} documents."
     )
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200
-    )
 
-    chunks = splitter.split_documents(
-        documents
-    )
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=800,
+    chunk_overlap=100
+)
 
-    print(
-        f"Created {len(chunks)} chunks."
-    )
-
-    embeddings = create_embeddings()
-
-    vectorstore = FAISS.from_documents(
-        chunks,
-        embeddings
-    )
-
-    FAISS_DIR.mkdir(
-        parents=True,
-        exist_ok=True
-    )
-
-    vectorstore.save_local(
-        str(FAISS_DIR)
-    )
-
-    print("FAISS index created successfully.")
+chunks = splitter.split_documents(documents)
 
 
-if __name__ == "__main__":
-    create_vector_database()
+embeddings = HuggingFaceEmbeddings(
+    model_name="BAAI/bge-small-en-v1.5"
+)
+
+
+Chroma.from_documents(
+    chunks,
+    embeddings,
+    persist_directory=str(DB),
+    collection_name="aster_row"
+)
+
+print(f"Indexed {len(chunks)} chunks.")

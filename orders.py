@@ -2,12 +2,18 @@ import json
 from pathlib import Path
 
 
-ORDERS_FILE = Path(__file__).resolve().parent / "data" / "orders.json"
+ORDERS_FILE = (
+    Path(__file__).resolve().parent
+    / "data"
+    / "orders.json"
+)
 
 
 def get_order(order_id):
     data = json.loads(
-        ORDERS_FILE.read_text(encoding="utf-8")
+        ORDERS_FILE.read_text(
+            encoding="utf-8"
+        )
     )
 
     order_id = order_id.strip().upper()
@@ -20,28 +26,39 @@ def get_order(order_id):
 
 
 def sanitize_order(order):
+
     if not order:
         return None
 
-    result = {
+    safe = {
         "order_id": order["order_id"],
         "status": order["status"],
         "shipped_at": order.get("shipped_at"),
         "delivered_at": order.get("delivered_at"),
         "carrier": order.get("carrier"),
         "tracking_number": order.get("tracking_number"),
-        "estimated_delivery": order.get("estimated_delivery"),
+        "estimated_delivery": order.get(
+            "estimated_delivery"
+        ),
+        "customer_safe_message": order.get(
+            "customer_safe_message"
+        )
     }
 
-    if order["status"].lower() in ["cancelled", "returned"]:
-        result["shipped_at"] = None
-        result["delivered_at"] = None
-        result["carrier"] = None
-        result["tracking_number"] = None
-        result["estimated_delivery"] = None
+    if order["status"].lower() in [
+        "cancelled",
+        "returned"
+    ]:
+        safe["shipped_at"] = None
+        safe["delivered_at"] = None
+        safe["carrier"] = None
+        safe["tracking_number"] = None
+        safe["estimated_delivery"] = None
 
-    return result
+    return safe
 
 
 def order_lookup(order_id):
-    return sanitize_order(get_order(order_id))
+    return sanitize_order(
+        get_order(order_id)
+    )
